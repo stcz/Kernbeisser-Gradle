@@ -19,7 +19,8 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-      # Production runs on Windows (case-insensitive table names); keep dumps compatible.
+      # Case-insensitive table names, so dumps from Windows servers (lowercase names) and
+      # Linux servers (mixed case, e.g. "Article") can both be imported and used.
       - --lower-case-table-names=1
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${DB_PORT:-3306}:3306"
