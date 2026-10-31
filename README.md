@@ -11,11 +11,13 @@ one, Gradle runs in Docker automatically.
 ```sh
 cp docker/.env.example docker/.env   # optional: adjust ports and passwords
 make db-up                           # start MariaDB (localhost:3306, db/user/password: kernbeisser)
+make db-demo                         # load the demo data (asks before replacing the database)
 make gui                             # build the app and run it in Docker
 ```
 
 Then open <http://localhost:6080/vnc.html?autoconnect=1&resize=remote>; the app runs in the browser
-tab. A Java debugger can attach to `localhost:5005` at any time.
+tab. Log in as `Admin` with the password `password`. A Java debugger can attach to `localhost:5005`
+at any time.
 
 On a machine with a desktop and JDK 21 you can run the app natively instead:
 
@@ -28,9 +30,43 @@ Run `make` for the list of all targets.
 
 ### Demo data
 
-On an empty database the app creates its tables on first start, but there is **no user to log in
-with**. Put a dump into `docker/initdb/` *before* the first `make db-up` (it is imported
-automatically when the database volume is created), or load it later:
+`make db-demo` replaces the dev database with the demo data from
+`docker/demo/kernbeisser-demo.sql.gz`: fictional German data with about 2,200 articles, a
+wholesale catalog, 12 regional suppliers, surcharge groups, price lists and a few transactions,
+plus 17 users with different roles. **Every user's password is `password`.** See
+[docker/demo/README.md](docker/demo/README.md) for how the articles and suppliers were generated.
+
+| User          | Roles (permissions)                                     |
+|---------------|---------------------------------------------------------|
+| `Admin`       | Administrator                                           |
+| `super.a`     | Administrator and full member                           |
+| `ricken.p`    | Cashier, store service lead                             |
+| `marie.c`     | Cashier                                                 |
+| `marigona.u`  | Full member, accounting                                 |
+| `christoph.s`, `john.d` | Full member, board                            |
+| `emma.r`      | Full member, member administration                      |
+| `rosa.l`      | Full member, account service                            |
+| `luis.m`, `marie.j` | Trial members                                     |
+| `laura.r`     | Basic access only                                       |
+
+The remaining users are full members with various jobs. `kernbeisser` is the store's internal
+account, not a person.
+
+`make db-demo` moves all transaction and purchase dates so that the newest purchase is from today.
+The app marks users without a purchase in the last 180 days as inactive, so most demo users are
+active, while `haile.s`, `shirin.e`, `marie.j` and `laura.r` only shopped longer ago and appear
+under *nur Inaktive*. Importing the dump in another way (e.g. via `docker/initdb/`) skips the date
+shift; run `make db-import DUMP=docker/demo/shift-dates.sql` afterwards.
+
+The demo database is at the current database version. When the code adds a new one
+(`kernbeisser.VersionIntegrationTools.Version`), the app updates the database on start as it does
+in production, so the demo file keeps working without changes.
+
+#### Your own data
+
+On an empty database the app creates its tables on first start, but there is no user to log in
+with. To work with another dump, put it into `docker/initdb/` *before* the first `make db-up`
+(it is imported automatically when the database volume is created), or load it later:
 
 ```sh
 make db-import DUMP=path/to/dump.sql   # into the running database
@@ -38,7 +74,7 @@ make db-import DUMP=path/to/dump.sql   # into the running database
 make db-reset && make db-up            # deletes the volume and re-imports docker/initdb/
 ```
 
-Dumps in `docker/initdb/` are ignored by git.
+Dumps in `docker/initdb/` are ignored by git, so real member data is not committed by accident.
 
 ## Development
 
@@ -108,6 +144,7 @@ extension reports missing `*_` classes (e.g. `Article_`), run `make dev-setup` o
 | `make db-down`    | Stop it (data is kept in the Docker volume)                   |
 | `make db-shell`   | MariaDB shell on the dev database                             |
 | `make db-logs`    | Follow the database log                                       |
+| `make db-demo`    | **Replace** the dev database with the demo data               |
 | `make db-import DUMP=…` | Import a `.sql` or `.sql.gz` dump into the running database |
 | `make db-dump [DUMP=…]` | Write the dev database to a dump file                 |
 | `make db-reset`   | **Delete** the database volume                                |

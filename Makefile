@@ -42,7 +42,7 @@ JDWP_OPTS        := -agentlib:jdwp=transport=dt_socket,server=y,suspend=$(SUSPEN
 
 .DEFAULT_GOAL := help
 .PHONY: help build test check format clean dev-config dev-setup run debug \
-        db-up db-down db-logs db-shell db-import db-dump db-reset \
+        db-up db-down db-logs db-shell db-import db-demo db-dump db-reset \
         gui gui-down adminer down
 
 help: ## Show this help
@@ -130,7 +130,15 @@ db-shell: ## Open a MariaDB shell on the dev database
 db-import: ## Import a dump into the running database: make db-import DUMP=file.sql[.gz]
 	@test -n "$(DUMP)" || { echo "usage: make db-import DUMP=file.sql[.gz]"; exit 1; }
 	$(if $(filter %.gz,$(DUMP)),gunzip -c,cat) "$(DUMP)" | \
-	  $(COMPOSE) exec -T db sh -c 'exec mariadb -uroot -p"$$MARIADB_ROOT_PASSWORD" "$$MARIADB_DATABASE"'
+	  $(COMPOSE) exec -T db sh -c 'exec mariadb -uroot -p"$$MARIADB_ROOT_PASSWORD" "$$MARIADB_DATABASE"' >/dev/null
+
+db-demo: db-up ## REPLACE the dev database with the demo data (every user's password: password)
+	@read -p "This replaces all data in the dev database with the demo data. Continue? [y/N] " a && [ "$$a" = y ]
+	$(COMPOSE) exec -T db sh -c 'exec mariadb -uroot -p"$$MARIADB_ROOT_PASSWORD" \
+	  -e "DROP DATABASE IF EXISTS \`$$MARIADB_DATABASE\`; CREATE DATABASE \`$$MARIADB_DATABASE\`"'
+	$(MAKE) --no-print-directory db-import DUMP=docker/demo/kernbeisser-demo.sql.gz
+	$(MAKE) --no-print-directory db-import DUMP=docker/demo/shift-dates.sql
+	@echo "Demo data loaded. Log in as Admin (or any other user) with the password: password"
 
 db-dump: ## Dump the dev database to a file: make db-dump [DUMP=file.sql]
 	$(COMPOSE) exec -T db sh -c 'exec mariadb-dump -uroot -p"$$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$$MARIADB_DATABASE"' \
